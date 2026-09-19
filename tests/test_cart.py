@@ -56,4 +56,60 @@ def test_removing_an_absent_item_raises():
         cart.remove_item(999)
 
 
-# TODO: add one test of your own. What behaviour is not covered above?
+# --- my own tests: behaviour not covered above ---------------------------
+
+
+def test_add_item_defaults_to_quantity_one():
+    cart = Cart()
+    cart.add_item(GYOZA)
+    assert cart.lines[0]["qty"] == 1
+
+
+def test_negative_quantity_is_rejected():
+    """qty < 1 covers negatives too, not just zero."""
+    cart = Cart()
+    with pytest.raises(ValueError):
+        cart.add_item(GYOZA, -3)
+
+
+def test_rejected_add_leaves_the_cart_unchanged():
+    """A rejected operation must not half-apply: no line, no quantity bump."""
+    cart = Cart()
+    cart.add_item(GYOZA, 2)
+
+    with pytest.raises(ValueError):
+        cart.add_item(GYOZA, 0)
+    with pytest.raises(OutOfStockError):
+        cart.add_item(MISO, 1)
+
+    assert len(cart.lines) == 1
+    assert cart.lines[0]["qty"] == 2
+    assert cart.total() == 16.00
+
+
+def test_remove_item_removes_only_the_named_line():
+    cart = Cart()
+    cart.add_item(GYOZA, 2)
+    cart.add_item(RAMEN, 1)
+
+    cart.remove_item(GYOZA["id"])
+
+    assert len(cart.lines) == 1
+    assert cart.lines[0]["item_id"] == RAMEN["id"]
+    assert cart.total() == 16.50
+
+
+def test_total_is_rounded_to_two_decimal_places():
+    """price * qty can drift in binary floating point; total() must round."""
+    odd_price = {"id": 99, "name": "Daily Special", "price": 4.10, "available": True}
+    cart = Cart()
+    cart.add_item(odd_price, 3)
+    assert 4.10 * 3 != 12.30          # the drift is real
+    assert cart.total() == 12.30      # total() absorbs it
+
+
+def test_repr_reports_line_count_and_total():
+    cart = Cart()
+    cart.add_item(GYOZA, 2)
+    cart.add_item(RAMEN, 1)
+    assert repr(cart) == "<Cart 2 items, $32.50>"
